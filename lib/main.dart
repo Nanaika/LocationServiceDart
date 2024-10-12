@@ -8,12 +8,14 @@ import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:location_tracker/ui.dart';
+import 'package:sensors_plus/sensors_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Geolocator.requestPermission();
   await initializeService();
+
   runApp(const MyApp());
 }
 
@@ -24,7 +26,7 @@ Future<void> initializeService() async {
     'MY FOREGROUND SERVICE', // title
     description:
         'This channel is used for important notifications.', // description
-    importance: Importance.low, // importance must be at low or higher level
+    importance: Importance.high, // importance must be at low or higher level
   );
 
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
@@ -79,10 +81,8 @@ Future<bool> onIosBackground(ServiceInstance service) async {
 
 @pragma('vm:entry-point')
 void onStart(ServiceInstance service) async {
-  print('ONSTART---------------------');
   DartPluginRegistrant.ensureInitialized();
-
-  // SharedPreferences preferences = await SharedPreferences.getInstance();
+  bool isAccelerating = false;
   Position? prevPosition;
   double distance = 0;
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
@@ -118,24 +118,40 @@ void onStart(ServiceInstance service) async {
       },
     );
   });
-  // Geolocator.getCurrentPosition().then((position) {
-  //   print('GETPOSITION-------------------------------');
-  //   service.invoke(
-  //     'updatePos',
-  //     {
-  //       "lat": position.latitude.toString(),
-  //       "long": position.longitude.toString(),
-  //     },
-  //   );service.invoke(
-  //     'updateDistance',
-  //     {
-  //       'distance': distance,
-  //     },
-  //   );
-  // });
 
-  // bring to foreground
-  // Timer.periodic(const Duration(seconds: 1), (timer) async {
+  int estSeconds = 0;
+
+  Timer? timer;
+
+  void startTimer() {
+    timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      estSeconds++;
+      int hours = estSeconds ~/ 3600;
+      int minutes = (estSeconds % 3600) ~/ 60;
+      int seconds = estSeconds % 60;
+      service.invoke('updateTime',
+          {'hours': hours, 'minutes': minutes, 'seconds': seconds});
+    });
+  }
+
+  void stopTimer() {
+    if (timer != null) {
+      timer!.cancel();
+    }
+  }
+
+  service.on('startTimer').listen((event) {
+    if (timer != null) {
+      if (timer!.isActive) {
+        stopTimer();
+      } else {
+        startTimer();
+      }
+    } else {
+      startTimer();
+    }
+  });
+
   if (service is AndroidServiceInstance) {
     if (await service.isForegroundService()) {
       flutterLocalNotificationsPlugin.show(
@@ -158,16 +174,34 @@ void onStart(ServiceInstance service) async {
       // );
     }
   }
-
+  userAccelerometerEventStream().listen((sensors) {
+    if (sensors.z > 0.2 || sensors.z < -0.2) {
+      isAccelerating = true;
+      stopTimer();
+    } else {
+      isAccelerating = false;
+    }
+  });
 
   Geolocator.getPositionStream(
       locationSettings: const LocationSettings(
-    accuracy: LocationAccuracy.best,
-    distanceFilter: 1,
+    accuracy: LocationAccuracy.bestForNavigation,
+    distanceFilter: 0,
   )).listen((position) {
-    print('GETPOSITIONSTREAM TRIGGER LISTEN------------------- ${position}');
+    if (!isAccelerating) {
+      return;
+    }
+
+    if (position.speed < 0.01) {
+      return;
+    }
 
     if (prevPosition != null) {
+      final dist = Geolocator.distanceBetween(prevPosition!.latitude,
+          prevPosition!.longitude, position.latitude, position.longitude);
+      if (dist > 5) {
+        return;
+      }
       distance += Geolocator.distanceBetween(prevPosition!.latitude,
           prevPosition!.longitude, position.latitude, position.longitude);
       prevPosition = position;
@@ -184,7 +218,11 @@ void onStart(ServiceInstance service) async {
         "long": position.longitude.toString(),
       },
     );
+    service.invoke(
+      'updateSpeed',
+      {
+        "speed": position.speed.toString(),
+      },
+    );
   });
-
-  // });
 }
