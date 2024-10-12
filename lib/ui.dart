@@ -40,15 +40,18 @@ class _MyAppState extends State<MyApp> {
                   const SizedBox(
                     height: 12,
                   ),
-                  Row(mainAxisAlignment: MainAxisAlignment.spaceBetween,crossAxisAlignment: CrossAxisAlignment.end, children: [
-                    const WaitingTime(),
-                    ElevatedButton(
-                      onPressed: () {
-                        FlutterBackgroundService().invoke("startTimer");
-                      },
-                      child: const Text('WAIT'),
-                    ),
-                  ]),
+                  Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        const WaitingTime(),
+                        ElevatedButton(
+                          onPressed: () {
+                            FlutterBackgroundService().invoke("startTimer");
+                          },
+                          child: const Text('WAIT'),
+                        ),
+                      ]),
                 ],
               ),
             ),
@@ -135,34 +138,19 @@ class WaitingTime extends StatelessWidget {
     return StreamBuilder<Map<String, dynamic>?>(
       stream: FlutterBackgroundService().on('updateTime'),
       builder: (BuildContext context, AsyncSnapshot<dynamic> snapshot) {
+        final int hours;
+        final int minutes;
+        final int seconds;
         if (!snapshot.hasData) {
-          return const Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'WAITING TIME : ',
-                style: TextStyle(color: Colors.grey),
-              ),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.baseline,
-                textBaseline: TextBaseline.alphabetic,
-                children: [
-                  Text(
-                    '00 : 00 : 00',
-                    style: TextStyle(
-                      color: Colors.black54,
-                      fontSize: 36,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  SizedBox(
-                    width: 8,
-                  ),
-                ],
-              ),
-            ],
-          );;
+          hours = 0;
+          minutes = 0;
+          seconds = 0;
+        } else {
+          hours = snapshot.data['hours'];
+          minutes = snapshot.data['minutes'];
+          seconds = snapshot.data['seconds'];
         }
+
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -175,7 +163,7 @@ class WaitingTime extends StatelessWidget {
               textBaseline: TextBaseline.alphabetic,
               children: [
                 Text(
-                  '${(snapshot.data['hours']?? 0).toString().padLeft(2, '0')} : ${(snapshot.data['minutes']?? 0).toString().padLeft(2, '0')} : ${(snapshot.data['seconds']?? 0).toString().padLeft(2, '0')}',
+                  '${(hours).toString().padLeft(2, '0')} : ${(minutes).toString().padLeft(2, '0')} : ${(seconds).toString().padLeft(2, '0')}',
                   style: const TextStyle(
                     color: Colors.black54,
                     fontSize: 36,

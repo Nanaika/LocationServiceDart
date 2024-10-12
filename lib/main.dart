@@ -11,6 +11,9 @@ import 'package:location_tracker/ui.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+const SECONDSKEY = 'SECONDSKEY';
+const DISTANCEKEY = 'DISTANCEKEY';
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Geolocator.requestPermission();
@@ -82,9 +85,14 @@ Future<bool> onIosBackground(ServiceInstance service) async {
 @pragma('vm:entry-point')
 void onStart(ServiceInstance service) async {
   DartPluginRegistrant.ensureInitialized();
+
+  final sp = await SharedPreferences.getInstance();
+
+
+  int estSeconds = sp.getInt(SECONDSKEY)?? 0;
+  double distance = sp.getDouble(DISTANCEKEY)?? 0.0;
   bool isAccelerating = false;
   Position? prevPosition;
-  double distance = 0;
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
 
@@ -98,7 +106,10 @@ void onStart(ServiceInstance service) async {
     });
   }
 
-  service.on('stopService').listen((event) {
+  service.on('stopService').listen((event) async {
+    final sp = await SharedPreferences.getInstance();
+    await sp.setInt(SECONDSKEY, estSeconds);
+    await sp.setDouble(DISTANCEKEY, distance);
     service.stopSelf();
   });
 
@@ -117,9 +128,13 @@ void onStart(ServiceInstance service) async {
         "distance": distance,
       },
     );
-  });
 
-  int estSeconds = 0;
+    int hours = estSeconds ~/ 3600;
+    int minutes = (estSeconds % 3600) ~/ 60;
+    int seconds = estSeconds % 60;
+    service.invoke(
+        'updateTime', {'hours': hours, 'minutes': minutes, 'seconds': seconds});
+  });
 
   Timer? timer;
 
