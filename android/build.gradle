@@ -1,0 +1,35 @@
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+
+buildscript {
+    ext.kotlin_version = '1.9.0' // Set this to 1.9.0 to match the library version
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+
+
+
+        // Other classpath dependencies
+    }
+}
+
+
+rootProject.buildDir = "../build"
+subprojects {
+    project.buildDir = "${rootProject.buildDir}/${project.name}"
+}
+subprojects {
+    project.evaluationDependsOn(":app")
+}
+
+tasks.register("clean", Delete) {
+    delete rootProject.buildDir
+}
